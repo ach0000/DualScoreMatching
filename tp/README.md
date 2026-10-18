@@ -8,22 +8,24 @@ Ce dépôt est un fork du [code des auteurs](https://github.com/FlorentinGuth/Du
 
 Chaque notebook commence par une cellule d'installation : sur Colab, elle télécharge **seulement** les fichiers dont
 le notebook a besoin (clone partiel : code, poids du réseau utilisé, résultats pré-calculés) ; en local, elle rend
-seulement le code importable. Les images (validation d'ImageNet 64×64) sont téléchargées au premier usage depuis un
-miroir HuggingFace (417 Mo).
+seulement le code importable. Les images (validation d'ImageNet 64×64, 417 Mo depuis un miroir HuggingFace) ne sont
+**pas** téléchargées par défaut : au premier lancement, dans la cellule « Données » qui suit l'installation, remplacer
+`if False:` par `if True:` (en local, une fois pour toutes ; sur Colab, à chaque nouvelle session).
 
 ## Notebooks du TP (dossier `tp/`)
 
-Chacun a un profil CPU (données jouets ou nombre d'images réduit) et un profil GPU (réglages des auteurs), choisis
-automatiquement. Durées CPU mesurées sur un ordinateur portable à 16 cœurs ; sur le CPU de Colab (2 cœurs), elles
+Chacun a un profil réduit (données jouets ou nombre d'images réduit), utilisé par défaut sur CPU comme sur GPU, et un
+profil GPU (réglages des auteurs, non vérifié), qui s'active en remplaçant `if False:` par `if True:` dans la cellule
+de réglages. Il en va de même pour les notebooks des auteurs (`tp/auteurs/`, cellule de compatibilité). Durées CPU mesurées sur un ordinateur portable à 16 cœurs ; sur le CPU de Colab (2 cœurs), elles
 sont nettement plus longues (non vérifié).
 
-| Notebook | CPU | GPU | Colab |
+| Notebook | Profil réduit (durée CPU) | Profil GPU | Colab |
 |---|---|---|---|
 | `TP_melange_gaussien` : pourquoi le score ne suffit pas (figure 1) | 6 min | 20 000 itérations | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ach0000/DualScoreMatching/blob/main/tp/TP_melange_gaussien.ipynb) |
 | `TP_reseau_energie` : architecture, scores, débruitage, normalisation (tableau 1) | 2 min | plus d'images | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ach0000/DualScoreMatching/blob/main/tp/TP_reseau_energie.ipynb) |
 | `TP_log_probabilites` : entropie, NLL, contenu, généralisation (figures 2 à 4, tableau 2) | 5 000 images, 6 min | 50 000 images | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ach0000/DualScoreMatching/blob/main/tp/TP_log_probabilites.ipynb) |
 | `TP_dimension_effective` : dimension effective (figure 5) | 6 images, 2 min | 15 images | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ach0000/DualScoreMatching/blob/main/tp/TP_dimension_effective.ipynb) |
-| `TP_entrainement_dual` : entraîner score, énergie simple et énergie duale | images 16×16, 1 h | images 64×64 | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ach0000/DualScoreMatching/blob/main/tp/TP_entrainement_dual.ipynb) |
+| `TP_entrainement_dual` : entraîner score, énergie simple et énergie duale | images 16×16, 25 à 45 min | images 64×64 | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ach0000/DualScoreMatching/blob/main/tp/TP_entrainement_dual.ipynb) |
 
 ## Notebooks des auteurs adaptés pour Colab (`tp/auteurs/`)
 
@@ -41,7 +43,7 @@ Les notebooks originaux des auteurs (racine du dépôt) ne sont pas modifiés : 
 `tp/auteurs/`, sous le même nom complété de `_colab`. Modifications (cellules marquées « TP ») : bouton Colab, cellule
 d'installation, cellule de compatibilité (`torch.load` des points de contrôle avec PyTorch ≥ 2.6, chargement sans GPU),
 `.cuda()` remplacé par `.to(DEVICE)`, pas de rendu LaTeX de matplotlib (absent de Colab), données ImageNet64
-téléchargées depuis un miroir, calculs réduits sur CPU, figures et résultats écrits dans `tp/resultats/auteurs/` (et
+téléchargées depuis un miroir (cellule « Données », désactivée par défaut), calculs réduits par défaut, figures et résultats écrits dans `tp/resultats/auteurs/` (et
 non dans `outputs/`, qui reste celui des auteurs). Le code Python des auteurs n'est pas modifié.
 
 ## Ajouts au dépôt des auteurs

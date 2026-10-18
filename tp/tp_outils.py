@@ -374,6 +374,9 @@ def preparer_imagenet64_val():
     couleur (N, 64, 64, 3) et niveaux de gris (N, 64, 64), conversion PIL « L » comme torchvision.transforms.Grayscale
     chez les auteurs. Quelques minutes ; reprenable.'''
     from PIL import Image
+    if all(os.path.exists(os.path.join(DOSSIER_DONNEES, n)) for n in ('val_couleur.npy', 'val_gris.npy', 'val_classes.npy')):
+        print('images déjà préparées dans %s' % DOSSIER_DONNEES)
+        return
     parquet = os.path.join(DOSSIER_DONNEES, 'validation.parquet')
     _telecharger(URL_IMAGENET64_VAL, parquet)
     couleur, classes = _decoder_parquet(parquet)
@@ -437,12 +440,13 @@ def ecrire_infos_auteurs():
 
 
 def charger_imagenet64_val(n=None, gris=True, debut=0, indices=None):
-    '''Images de validation d'ImageNet64 (reconstruites au premier appel), tenseur float (n, C, 64, 64) dans [0, 1] :
-    C = 1 (gris) ou 3 (couleur) ; les n images à partir de debut, ou celles des indices donnés (numérotation des
-    auteurs). Ces images n'ont servi à entraîner aucun des réseaux.'''
+    '''Images de validation d'ImageNet64 (préparées par preparer_imagenet64_val, cellule « Données » des notebooks),
+    tenseur float (n, C, 64, 64) dans [0, 1] : C = 1 (gris) ou 3 (couleur) ; les n images à partir de debut, ou celles
+    des indices donnés (numérotation des auteurs). Ces images n'ont servi à entraîner aucun des réseaux.'''
     fichier = os.path.join(DOSSIER_DONNEES, 'val_gris.npy' if gris else 'val_couleur.npy')
     if not os.path.exists(fichier):
-        preparer_imagenet64_val()
+        raise FileNotFoundError("images d'ImageNet64 absentes (%s) : dans la cellule « Données » du notebook, remplacer "
+                                "if False: par if True: et l'exécuter (téléchargement de 417 Mo)" % fichier)
     tableau = np.load(fichier, mmap_mode='r')
     if indices is not None:
         x = torch.from_numpy(np.array(tableau[np.asarray(indices)])).float() / 255
