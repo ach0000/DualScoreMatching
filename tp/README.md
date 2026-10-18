@@ -14,15 +14,16 @@ miroir HuggingFace (417 Mo).
 ## Notebooks du TP (dossier `tp/`)
 
 Chacun a un profil CPU (données jouets ou nombre d'images réduit) et un profil GPU (réglages des auteurs), choisis
-automatiquement.
+automatiquement. Durées CPU mesurées sur un ordinateur portable à 16 cœurs ; sur le CPU de Colab (2 cœurs), elles
+sont nettement plus longues.
 
 | Notebook | CPU | GPU | Colab |
 |---|---|---|---|
 | `TP_melange_gaussien` : pourquoi le score ne suffit pas (figure 1) | 6 min | 20 000 itérations | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ach0000/DualScoreMatching/blob/main/tp/TP_melange_gaussien.ipynb) |
-| `TP_reseau_energie` : architecture, scores, débruitage, normalisation (tableau 1) | 3 min | plus d'images | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ach0000/DualScoreMatching/blob/main/tp/TP_reseau_energie.ipynb) |
-| `TP_log_probabilites` : entropie, NLL, contenu, généralisation (figures 2 à 4, tableau 2) | 5 000 images | 50 000 images | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ach0000/DualScoreMatching/blob/main/tp/TP_log_probabilites.ipynb) |
-| `TP_dimension_effective` : dimension effective (figure 5) | 6 images | 15 images | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ach0000/DualScoreMatching/blob/main/tp/TP_dimension_effective.ipynb) |
-| `TP_entrainement_dual` : entraîner score, énergie simple et énergie duale | images 16×16 | images 64×64 | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ach0000/DualScoreMatching/blob/main/tp/TP_entrainement_dual.ipynb) |
+| `TP_reseau_energie` : architecture, scores, débruitage, normalisation (tableau 1) | 2 min | plus d'images | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ach0000/DualScoreMatching/blob/main/tp/TP_reseau_energie.ipynb) |
+| `TP_log_probabilites` : entropie, NLL, contenu, généralisation (figures 2 à 4, tableau 2) | 5 000 images, 6 min | 50 000 images | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ach0000/DualScoreMatching/blob/main/tp/TP_log_probabilites.ipynb) |
+| `TP_dimension_effective` : dimension effective (figure 5) | 6 images, 2 min | 15 images | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ach0000/DualScoreMatching/blob/main/tp/TP_dimension_effective.ipynb) |
+| `TP_entrainement_dual` : entraîner score, énergie simple et énergie duale | images 16×16, 1 h | images 64×64 | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ach0000/DualScoreMatching/blob/main/tp/TP_entrainement_dual.ipynb) |
 
 ## Notebooks des auteurs adaptés pour Colab (`tp/auteurs/`)
 
