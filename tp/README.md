@@ -15,7 +15,7 @@ miroir HuggingFace (417 Mo).
 
 Chacun a un profil CPU (données jouets ou nombre d'images réduit) et un profil GPU (réglages des auteurs), choisis
 automatiquement. Durées CPU mesurées sur un ordinateur portable à 16 cœurs ; sur le CPU de Colab (2 cœurs), elles
-sont nettement plus longues.
+sont nettement plus longues (non vérifié).
 
 | Notebook | CPU | GPU | Colab |
 |---|---|---|---|
