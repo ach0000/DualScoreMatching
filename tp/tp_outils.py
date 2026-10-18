@@ -5,7 +5,7 @@ Outils communs aux notebooks du TP « Densités d'images normalisées par score 
 Ce module complète le code des auteurs (répertoire parent) sans le modifier :
  - chargement sur CPU ou GPU des trois réseaux fournis (énergie niveaux de gris, énergie couleur,
    débruiteur couleur), sans ImageNet64 ni DataParallel ;
- - données : ImageNet64 (version de Chrabaszcz et al., celle des auteurs), d'après un miroir HuggingFace ;
+ - données : ImageNet64 (version de Chrabaszcz et al., celle des auteurs), depuis image-net.org (validation) ;
  - énergie, scores d'espace et de temps, laplacien (estimateur de Hutchinson), constante de normalisation ;
  - mélange de deux gaussiennes de l'article (figure 1) : énergie exacte, petit modèle d'énergie, entraînement
    par score matching simple ou dual ;
@@ -15,6 +15,7 @@ Conventions des auteurs reprises ici : images dans [0, 1], de forme (B, C, 64, 6
 bruit par pixel (y = x + sqrt(t) z) ; U(y, t) est l'énergie, c'est-à-dire -log p(y | t), en nats ;
 ∇_y U est le score d'espace changé de signe, ∂_t U le score de temps changé de signe.
 '''
+import hashlib
 import io
 import math
 import os
@@ -308,12 +309,25 @@ def constante_normalisation(m, X, t_max=T_MAX, taille_lot=256, graine=0):
 # ------------------------------------------------------------------------------------------------
 # Données : ImageNet64 (version de Chrabaszcz et al., 2017, celle des auteurs)
 # ------------------------------------------------------------------------------------------------
-# Miroir HuggingFace de la version de Chrabaszcz et al. (images PNG, sans perte) : mêmes images de validation, dans le
-# même ordre, que celles des auteurs (vérifié : log-probabilités identiques à celles de outputs/energies_test.pt aux
-# retournements horizontaux près), ce qui rend utilisables leurs énergies pré-calculées et leurs indices d'images.
-MIROIR = 'https://huggingface.co/datasets/ChocolateDave/imagenet-64/resolve/main/data/'
-URL_IMAGENET64_VAL = MIROIR + 'val-00000-of-00001.parquet'                 # 50 000 images, 417 Mo
-URL_IMAGENET64_TRAIN = MIROIR + 'train-{:05d}-of-00022.parquet'           # 22 fragments d'environ 58 000 images
+# Validation : fichier officiel de image-net.org (archive zip contenant val_data, le fichier même qu'attend data.py),
+# en libre accès. Ce sont les images des auteurs, dans leur ordre (vérifié : log-probabilités identiques à celles de
+# outputs/energies_test.pt aux retournements horizontaux près), ce qui rend utilisables leurs énergies pré-calculées et
+# leurs indices d'images.
+URL_IMAGENET64_VAL = 'https://image-net.org/data/downsample/Imagenet64_val.zip'      # 50 000 images, 534 Mo
+SHA256_IMAGENET64_VAL = '87f8053329e0a0b348b1bc070c98dbe0a427d30fc67216096078e5e282f37ecf'
+# Premier fragment d'entraînement (notebooks des auteurs seulement) : les 58 235 premières images du premier fichier
+# d'entraînement officiel (train_data_batch_1), au choix
+#  - depuis le miroir HuggingFace ChocolateDave/imagenet-64 (images PNG, sans perte), version figée : son premier
+#    fragment contient exactement ces images, dans le même ordre (vérifié pixel à pixel) ; 483 Mo ;
+#  - depuis image-net.org : seul le début de l'archive (train_data_batch_1, 1,37 Go sur 6,8 Go) est téléchargé.
+URL_CHOCOLATEDAVE_TRAIN0 = ('https://huggingface.co/datasets/ChocolateDave/imagenet-64/resolve/'
+                            'f2040dd23c6f0603c75e8d42af1b4badef2ab03b/data/train-00000-of-00022.parquet')
+SHA256_CHOCOLATEDAVE_TRAIN0 = 'df6967a5ba71b10cbc24d6c02eef7e0484a1443ecfdb72ac710f1b30a068f6ad'
+URL_IMAGENET64_TRAIN1 = 'https://image-net.org/data/downsample/Imagenet64_train_part1.zip'
+TAILLE_IMAGENET64_BATCH1 = 1367356217      # octets du début de l'archive : en-tête et train_data_batch_1 compressé
+SHA256_IMAGENET64_BATCH1 = '33843ffe664fcf14e4272530f2b1efa2e3ce5af46d69bdb3fbfd7376cb392c3e'
+N_FRAGMENT_TRAIN = 58_235
+# Classes : celles des fichiers officiels (1 à 1000) ; le miroir les numérote de 0 à 999 (décalage corrigé ici).
 DOSSIER_DONNEES = os.path.join(RACINE, 'data', 'imagenet64_chrabaszcz')
 
 
@@ -327,18 +341,25 @@ def _dossier_donnees(dossier):
             f.write('# données téléchargées par le TP (tp/tp_outils.py) : jamais publiées\n*\n')
 
 
-def _telecharger(url, chemin):
-    '''Téléchargement reprenable : un fichier partiel (.part) est complété à la reprise (en-tête Range).'''
+def _telecharger(url, chemin, sha256=None, taille=None):
+    '''Téléchargement reprenable : un fichier partiel (.part) est complété à la reprise (en-tête Range). taille :
+    ne télécharger que les premiers octets du fichier distant. sha256 : empreinte attendue, vérifiée à la fin (un
+    fichier différent est supprimé et signalé).'''
     if os.path.exists(chemin):
         return
     _dossier_donnees(os.path.dirname(chemin))
     partiel = chemin + '.part'
     for essai in range(20):
         deja = os.path.getsize(partiel) if os.path.exists(partiel) else 0
-        requete = urllib.request.Request(url, headers={'Range': 'bytes=%d-' % deja} if deja else {})
+        if taille is not None and deja >= taille:
+            break
+        plage = 'bytes=%d-%s' % (deja, '' if taille is None else taille - 1)
+        requete = urllib.request.Request(url, headers={'Range': plage} if deja or taille else {})
         try:
             with urllib.request.urlopen(requete, timeout=60) as reponse:
-                if deja and reponse.status != 206:     # le serveur ignore Range : on repart de zéro
+                if (deja or taille) and reponse.status != 206:     # le serveur ignore Range
+                    if taille is not None:
+                        raise RuntimeError('le serveur ne permet pas le téléchargement partiel : ' + url)
                     deja = 0
                 total = deja + int(reponse.headers.get('Content-Length', 0))
                 print('téléchargement de %s (%.0f Mo%s)' % (url, total / 1e6, ', reprise' if deja else ''),
@@ -349,16 +370,53 @@ def _telecharger(url, chemin):
                         if not bloc:
                             break
                         f.write(bloc)
-            os.replace(partiel, chemin)
-            return
+            if taille is None or os.path.getsize(partiel) >= taille:
+                break
         except (OSError, urllib.error.URLError) as erreur:
             print('  interruption du téléchargement (%s) : nouvel essai' % erreur, flush=True)
             time.sleep(5)
-    raise RuntimeError('téléchargement impossible : ' + url)
+    else:
+        raise RuntimeError('téléchargement impossible : ' + url)
+    if sha256 is not None:
+        h = hashlib.sha256()
+        with open(partiel, 'rb') as f:
+            for bloc in iter(lambda: f.read(1 << 20), b''):
+                h.update(bloc)
+        if h.hexdigest() != sha256:
+            os.remove(partiel)
+            raise RuntimeError('fichier téléchargé différent de celui attendu (empreinte %s) : %s' % (h.hexdigest(), url))
+    os.replace(partiel, chemin)
+
+
+class _DepickleurRestreint(pickle.Unpickler):
+    '''Lecture d'un fichier « pickle » de Chrabaszcz et al. (dictionnaire de tableaux numpy et de listes) : seuls les
+    types numpy nécessaires sont acceptés, car lire un pickle quelconque peut exécuter du code.'''
+    AUTORISES = {('numpy.core.multiarray', '_reconstruct'), ('numpy._core.multiarray', '_reconstruct'),
+                 ('numpy', 'ndarray'), ('numpy', 'dtype'), ('numpy.core.multiarray', 'scalar'),
+                 ('numpy._core.multiarray', 'scalar'), ('_codecs', 'encode')}
+
+    def find_class(self, module, nom):
+        if (module, nom) in self.AUTORISES:
+            return super().find_class(module, nom)
+        raise pickle.UnpicklingError('type refusé dans le fichier de données : %s.%s' % (module, nom))
+
+
+def _lire_pickle_chrabaszcz(f):
+    '''Images RGB uint8 (N, 64, 64, 3) et classes (1 à 1000) d'un fichier ouvert au format de Chrabaszcz et al.'''
+    d = _DepickleurRestreint(f, encoding='latin1').load()
+    images = np.asarray(d['data']).reshape(-1, 3, 64, 64).transpose(0, 2, 3, 1)
+    return np.ascontiguousarray(images), np.asarray(d['labels'])
+
+
+def _telecharger_imagenet64_val():
+    '''Archive officielle de la validation (534 Mo), vérifiée ; renvoie son chemin.'''
+    archive = os.path.join(DOSSIER_DONNEES, 'Imagenet64_val.zip')
+    _telecharger(URL_IMAGENET64_VAL, archive, sha256=SHA256_IMAGENET64_VAL)
+    return archive
 
 
 def _decoder_parquet(chemin, indices=None):
-    '''Images RGB uint8 (N, 64, 64, 3) et classes d'un fichier parquet du miroir.'''
+    '''Images RGB uint8 (N, 64, 64, 3) et classes (0 à 999) d'un fichier parquet du miroir.'''
     from PIL import Image
     import pyarrow.parquet as pq
     table = pq.read_table(chemin)
@@ -369,17 +427,59 @@ def _decoder_parquet(chemin, indices=None):
     return couleur, np.asarray(table.column('label').to_pylist())
 
 
+def _fragment_train_chocolatedave():
+    '''Les 58 235 premières images d'entraînement, depuis le miroir ChocolateDave (483 Mo, version figée, vérifiée).'''
+    parquet = os.path.join(DOSSIER_DONNEES, 'train0.parquet')
+    _telecharger(URL_CHOCOLATEDAVE_TRAIN0, parquet, sha256=SHA256_CHOCOLATEDAVE_TRAIN0)
+    X, y = _decoder_parquet(parquet)
+    return X, y + 1
+
+
+def _fragment_train_imagenet():
+    '''Les mêmes 58 235 images, depuis image-net.org : début de Imagenet64_train_part1.zip (1,37 Go : en-tête local et
+    train_data_batch_1 compressé), décompressé (1,57 Go, contrôle CRC de l'archive) puis lu.'''
+    import struct
+    import zlib
+    debut = os.path.join(DOSSIER_DONNEES, 'Imagenet64_train_part1_debut.bin')
+    _telecharger(URL_IMAGENET64_TRAIN1, debut, sha256=SHA256_IMAGENET64_BATCH1, taille=TAILLE_IMAGENET64_BATCH1)
+    brut = os.path.join(DOSSIER_DONNEES, 'train_data_batch_1')
+    with open(debut, 'rb') as f:
+        entete = f.read(30)
+        if entete[:4] != b'PK\x03\x04':
+            raise RuntimeError('archive inattendue : ' + debut)
+        crc_attendu, = struct.unpack('<I', entete[14:18])
+        n_nom, n_extra = struct.unpack('<HH', entete[26:30])
+        f.read(n_nom + n_extra)
+        d, crc = zlib.decompressobj(-15), 0
+        with open(brut + '.part', 'wb') as g:
+            while True:
+                bloc = f.read(1 << 24)
+                x = d.decompress(bloc) if bloc else d.flush()
+                g.write(x)
+                crc = zlib.crc32(x, crc)
+                if not bloc:
+                    break
+    if crc != crc_attendu:
+        os.remove(brut + '.part')
+        raise RuntimeError('train_data_batch_1 corrompu (CRC) : supprimer %s et recommencer' % debut)
+    os.replace(brut + '.part', brut)
+    with open(brut, 'rb') as g:
+        X, y = _lire_pickle_chrabaszcz(g)
+    os.remove(brut)
+    return X[:N_FRAGMENT_TRAIN].copy(), y[:N_FRAGMENT_TRAIN].copy()
+
+
 def preparer_imagenet64_val():
-    '''Télécharge (417 Mo) et décode les 50 000 images de validation d'ImageNet64, puis les enregistre en uint8 :
-    couleur (N, 64, 64, 3) et niveaux de gris (N, 64, 64), conversion PIL « L » comme torchvision.transforms.Grayscale
-    chez les auteurs. Quelques minutes ; reprenable.'''
+    '''Télécharge (534 Mo, image-net.org) et lit les 50 000 images de validation d'ImageNet64, puis les enregistre en
+    uint8 : couleur (N, 64, 64, 3) et niveaux de gris (N, 64, 64), conversion PIL « L » comme
+    torchvision.transforms.Grayscale chez les auteurs. Reprenable.'''
+    import zipfile
     from PIL import Image
     if all(os.path.exists(os.path.join(DOSSIER_DONNEES, n)) for n in ('val_couleur.npy', 'val_gris.npy', 'val_classes.npy')):
         print('images déjà préparées dans %s' % DOSSIER_DONNEES)
         return
-    parquet = os.path.join(DOSSIER_DONNEES, 'validation.parquet')
-    _telecharger(URL_IMAGENET64_VAL, parquet)
-    couleur, classes = _decoder_parquet(parquet)
+    with zipfile.ZipFile(_telecharger_imagenet64_val()) as z, z.open('val_data') as f:
+        couleur, classes = _lire_pickle_chrabaszcz(f)
     gris = np.stack([np.asarray(Image.fromarray(c).convert('L')) for c in couleur])
     for nom, tableau in [('val_couleur.npy', couleur), ('val_gris.npy', gris), ('val_classes.npy', classes)]:
         np.save(os.path.join(DOSSIER_DONNEES, nom + '.part.npy'), tableau)
@@ -392,16 +492,21 @@ STATISTIQUES_IMAGENET64 = {True: (0.4568142592906952, 0.06533287465572357),
                            False: (0.4476744532585144, 0.07243767380714417)}
 
 
-def preparer_imagenet64_auteurs():
+def preparer_imagenet64_auteurs(entrainement='chocolatedave'):
     '''Écrit data/imagenet64/ au format qu'attend le code des auteurs (classe ImageNet64 de data.py, format
     « pickle » de Chrabaszcz et al. : dictionnaires {'data': (N, 3*64*64) uint8 en ordre C, H, W, 'labels': [...]}),
     ainsi que les fichiers de statistiques (info_*.pt) que data.load_data mémorise : ils sont repris des points de
     contrôle des auteurs, ce qui évite de les recalculer (le calcul des auteurs exige un GPU).
-      - val_data : les 50 000 images de validation, dans l'ordre des auteurs ;
-      - train_data_batch_1 : le premier des 22 fragments d'entraînement du miroir (environ 58 000 images, 483 Mo) ;
-        train_data_batch_2 à 10 sont vides. Suffisant pour les notebooks des auteurs, qui n'utilisent les images
-        d'entraînement que pour comparer les NLL d'entraînement et de test.'''
-    from memoize import short_name
+      - val_data : le fichier officiel lui-même (50 000 images, image-net.org, 534 Mo) ;
+      - train_data_batch_1 : les 58 235 premières images d'entraînement officielles, depuis le miroir ChocolateDave
+        (entrainement='chocolatedave', 483 Mo) ou depuis image-net.org (entrainement='imagenet', 1,37 Go) : mêmes
+        images ; train_data_batch_2 à 10 sont vides. Suffisant pour les notebooks des auteurs, qui n'utilisent les
+        images d'entraînement que pour comparer les NLL d'entraînement et de test.'''
+    import shutil
+    import zipfile
+    sources = {'chocolatedave': _fragment_train_chocolatedave, 'imagenet': _fragment_train_imagenet}
+    if entrainement not in sources:
+        raise ValueError("entrainement : 'chocolatedave' ou 'imagenet'")
     dossier = os.path.join(RACINE, 'data', 'imagenet64')
     _dossier_donnees(dossier)
 
@@ -412,13 +517,13 @@ def preparer_imagenet64_auteurs():
         os.replace(chemin + '.part', chemin)
 
     if not os.path.exists(os.path.join(dossier, 'val_data')):
-        parquet = os.path.join(DOSSIER_DONNEES, 'validation.parquet')
-        _telecharger(URL_IMAGENET64_VAL, parquet)
-        ecrire('val_data', *_decoder_parquet(parquet))
+        chemin = os.path.join(dossier, 'val_data')
+        with zipfile.ZipFile(_telecharger_imagenet64_val()) as z, z.open('val_data') as f, \
+                open(chemin + '.part', 'wb') as g:
+            shutil.copyfileobj(f, g)
+        os.replace(chemin + '.part', chemin)
     if not os.path.exists(os.path.join(dossier, 'train_data_batch_10')):
-        parquet = os.path.join(DOSSIER_DONNEES, 'train0.parquet')
-        _telecharger(URL_IMAGENET64_TRAIN.format(0), parquet)
-        ecrire('train_data_batch_1', *_decoder_parquet(parquet))
+        ecrire('train_data_batch_1', *sources[entrainement]())
         for k in range(2, 11):
             ecrire('train_data_batch_%d' % k, np.zeros((0, 64, 64, 3), np.uint8), [])
     ecrire_infos_auteurs()
@@ -446,7 +551,7 @@ def charger_imagenet64_val(n=None, gris=True, debut=0, indices=None):
     fichier = os.path.join(DOSSIER_DONNEES, 'val_gris.npy' if gris else 'val_couleur.npy')
     if not os.path.exists(fichier):
         raise FileNotFoundError("images d'ImageNet64 absentes (%s) : dans la cellule « Données » du notebook, remplacer "
-                                "if False: par if True: et l'exécuter (téléchargement de 417 Mo)" % fichier)
+                                "if False: par if True: et l'exécuter (téléchargement de 534 Mo)" % fichier)
     tableau = np.load(fichier, mmap_mode='r')
     if indices is not None:
         x = torch.from_numpy(np.array(tableau[np.asarray(indices)])).float() / 255

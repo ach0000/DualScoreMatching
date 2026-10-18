@@ -8,7 +8,7 @@ Ce dépôt est un fork du [code des auteurs](https://github.com/FlorentinGuth/Du
 
 Chaque notebook commence par une cellule d'installation : sur Colab, elle télécharge **seulement** les fichiers dont
 le notebook a besoin (clone partiel : code, poids du réseau utilisé, résultats pré-calculés) ; en local, elle rend
-seulement le code importable. Les images (validation d'ImageNet 64×64, 417 Mo depuis un miroir HuggingFace) ne sont
+seulement le code importable. Les images (validation d'ImageNet 64×64, 534 Mo depuis image-net.org) ne sont
 **pas** téléchargées par défaut : au premier lancement, dans la cellule « Données » qui suit l'installation, remplacer
 `if False:` par `if True:` (en local, une fois pour toutes ; sur Colab, à chaque nouvelle session).
 
@@ -43,7 +43,7 @@ Les notebooks originaux des auteurs (racine du dépôt) ne sont pas modifiés : 
 `tp/auteurs/`, sous le même nom complété de `_colab`. Modifications (cellules marquées « TP ») : bouton Colab, cellule
 d'installation, cellule de compatibilité (`torch.load` des points de contrôle avec PyTorch ≥ 2.6, chargement sans GPU),
 `.cuda()` remplacé par `.to(DEVICE)`, pas de rendu LaTeX de matplotlib (absent de Colab), données ImageNet64
-téléchargées depuis un miroir (cellule « Données », désactivée par défaut), calculs réduits par défaut, figures et résultats écrits dans `tp/resultats/auteurs/` (et
+téléchargées par la cellule « Données » (désactivée par défaut), calculs réduits par défaut, figures et résultats écrits dans `tp/resultats/auteurs/` (et
 non dans `outputs/`, qui reste celui des auteurs). Le code Python des auteurs n'est pas modifié.
 
 ## Ajouts au dépôt des auteurs
@@ -57,7 +57,11 @@ non dans `outputs/`, qui reste celui des auteurs). Le code Python des auteurs n'
   sans modifier le `.gitignore` des auteurs.
 
 **Données.** Les auteurs utilisent la version d'ImageNet64 de Chrabaszcz et al. (2017), qu'ils ne distribuent pas.
-On la télécharge depuis un miroir HuggingFace de cette version (`ChocolateDave/imagenet-64`, images PNG) : les images
-de validation sont les mêmes, dans le même ordre, que celles des auteurs, si bien que leurs énergies pré-calculées
-(`outputs/`) et leurs indices d'images restent valables. Conditions d'utilisation d'ImageNet : usage non commercial, de
+La validation (50 000 images) est le fichier officiel de [image-net.org](https://image-net.org/download-images),
+en libre accès (534 Mo, empreinte vérifiée) : ce sont les images des auteurs, dans leur ordre, si bien que leurs
+énergies pré-calculées (`outputs/`) et leurs indices d'images restent valables. Les notebooks des auteurs demandent
+en plus les 58 235 premières images d'entraînement : par défaut depuis le miroir HuggingFace
+[`ChocolateDave/imagenet-64`](https://huggingface.co/datasets/ChocolateDave/imagenet-64) (version figée, 483 Mo, mêmes
+images vérifiées pixel à pixel) ; dans la cellule « Données », la branche `else:` les prend sur image-net.org
+(1,37 Go). Conditions d'utilisation d'ImageNet : usage non commercial, de
 recherche ou d'enseignement.
